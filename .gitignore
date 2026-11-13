@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secrets (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Data, models and generated outputs (too big for git)
+data/
+models/
+outputs/
+checkpoints/
+*.parquet
+*.csv
+*.zip
+*.pkl
+*.parq
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+*.crc
+.spark-*/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+CONTRIBUTION.md
+PROJECT_GUIDE.md
