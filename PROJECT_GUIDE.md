@@ -105,13 +105,20 @@ the next stage reads it. Use mock data until the real files exist.
 
 | File | Columns | Written by | Read by |
 |---|---|---|---|
-| `ratings_train.parquet`, `ratings_test.parquet` | userId, movieId, rating, timestamp | A | A, B |
-| `als_model/` | Spark ALSModel | A | B |
-| `recs.parquet` | userId, movieId, score, rank | A | B, C |
-| `evidence.parquet` | userId, movieId (recommended), evidence: array<struct<movieId, influence>> | B | C |
-| `explanations.parquet` | userId, movieId, text, cited_items: array<int>, llm_name, prompt_version | C | B |
-| `grounding.parquet` | userId, movieId, grounded: bool, unsupported_claims | C | report |
-| `faithfulness.parquet` | userId, movieId, cited_item, score_before, score_after, rank_before, rank_after, faithful: bool | B | report |
+| `ratings_train.parquet`, `ratings_test.parquet` | userId, movieId, rating, timestamp | prepare | all |
+| `movies.parquet` | movieId, title, genres, year | prepare | explain, demo |
+| `als_model/` | `user_factors/` (userId, features), `item_factors/` (movieId, features), `meta.json` (rank, regParam, alpha, implicitPrefs) | train | evidence, verify |
+| `recs.parquet` | userId, movieId, score, rank | train | evidence |
+| `evidence.parquet` | userId, movieId (recommended), rank, score, n_history, total_pos_influence, evidence: array<struct<movieId, influence, rating>> | evidence | explain, verify |
+| `explanations.parquet` | userId, movieId, text, cited_items: array<int>, llm_name, prompt_version, attempts, fell_back | explain | check, verify |
+| `grounding.parquet` | userId, movieId, grounded: bool, unsupported_claims: array<string>, cited_present, rec_present, n_words, flesch, llm_name | check | report |
+| `faithfulness.parquet` | userId, movieId, condition ('cited'/'random'), trial, cited_item: array<int> (items removed together), score_before, score_after, rel_drop, rank_before, rank_after, faithful: bool, n_history | verify | report |
+
+Notes (single-maintainer revisions): the ALS model is stored as factor Parquet + JSON
+(Spark's `ALSModel.save` needs Hadoop native I/O on Windows, and downstream stages only
+need the factors). `cited_item` holds all cited items because an explanation's claim is
+about its cited items jointly; they are removed together. Columns beyond the original
+contract are additive.
 
 Do not change a schema without telling the other two.
 
@@ -120,7 +127,7 @@ Do not change a schema without telling the other two.
 - **Evidence:** the past interactions with the largest influence on a given recommendation.
 - **Influence score:** drop in the predicted score for the recommended item when that past interaction is removed.
 - **Grounded explanation:** mentions only items and facts that are in its evidence record.
-- **Faithful explanation:** if its cited evidence is removed, the recommendation's score drops materially or its rank falls out of the top-K. Define the threshold together, then fix it.
+- **Faithful explanation:** if its cited evidence is removed (all cited items together, user vector recomputed by fold-in), the recommendation's score drops by at least `verify.rel_drop_threshold` (default 10%, relative) or its rank falls out of the top-K (`als.top_k`, default 10).
 - **Faithfulness score:** fraction of tested explanations that are faithful. Report it next to the random-removal baseline.
 
 ## 8. Timeline (9 weeks)
