@@ -52,6 +52,7 @@ verify:
 utility:
   test_fraction: 0.3            # user-level holdout for the proxy classifier
   seed: 11
+  repeats: 5                    # grouped splits (different seeds)
 
 bench:
   datasets: [ml-latest-small, ml-1m, ml-25m]

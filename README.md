@@ -97,6 +97,7 @@ All settings live in `configs/default.yaml`; override any of them with
 | M3 explanations (evidence-only) | `python -m src.explain.generate` | `explanations.parquet` |
 | M4 grounding + hallucination checks | `python -m src.explain.check` | `grounding.parquet`, `grounding_summary.json` |
 | M5 faithfulness verification | `python -m src.verify.faithfulness` | `faithfulness.parquet`, `faithfulness_summary.json`, `faithfulness_sweep.csv` |
+| M6 utility (offline proxy classifier) | `python -m src.eval.utility` | `utility.json` |
 | Tests | `python -m pytest -q` | |
 
 ### Windows notes
