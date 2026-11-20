@@ -21,7 +21,7 @@ MovieLens 25M → clean + split → ALS → recommendations
 
 ## Documentation
 - [PROJECT_GUIDE.md](PROJECT_GUIDE.md): full project idea, roles, data contracts, timeline
-- [CONTRIBUTING.md](CONTRIBUTING.md): git workflow every teammate must follow
+- [CONTRIBUTION.md](CONTRIBUTION.md): git workflow every teammate must follow
 
 ## Repo structure
 
@@ -82,6 +82,26 @@ first so Spark runs fast on laptops.
 python -c "from pyspark.sql import SparkSession; s=SparkSession.builder.master('local[*]').getOrCreate(); print(s.version); s.stop()"
 ```
 
+## Running the pipeline
+
+All settings live in `configs/default.yaml`; override any of them with
+`--set key=value` (e.g. `--set dataset=ml-1m`). Outputs go to
+`outputs/<dataset>/`. Run from the repo root with the venv active.
+
+| Stage | Command | Writes |
+|---|---|---|
+| Download data | `python -m src.als.download --dataset ml-latest-small` | `data/raw/ml-latest-small/` |
+| M1 prepare (clean + time split) | `python -m src.als.prepare` | `ratings_train/test.parquet`, `movies.parquet` |
+| M1 train (tune + ALS + metrics) | `python -m src.als.train` | `als_model/`, `recs.parquet`, `als_metrics.json`, `als_tuning.csv` |
+| Tests | `python -m pytest -q` | |
+
+### Windows notes
+- Python 3.12 needs `setuptools` (in `requirements.txt`) because `pyspark.ml` still imports `distutils`.
+- Spark's own Parquet/CSV I/O on Windows needs Hadoop's `winutils.exe` + `hadoop.dll` in
+  `%HADOOP_HOME%in`. Without them, `src/common/io.py` automatically falls back to
+  pyarrow (parallel per-partition writes, Arrow reads into Spark DataFrames); with them
+  it uses `df.write.parquet` / `spark.read.parquet`. All computation is Spark either way.
+
 ## Team and ownership
 
 | Role | Area | Folders |
@@ -94,7 +114,7 @@ Names: _fill in_
 
 ## Workflow in short
 Never push to `main`. Create a branch, commit, push, open a Pull Request, and get
-one review. Full rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
+one review. Full rules are in [CONTRIBUTION.md](CONTRIBUTION.md).
 
 ## Tech stack
 Apache Spark (PySpark, MLlib) · Databricks CE / AWS EMR / Google Dataproc ·

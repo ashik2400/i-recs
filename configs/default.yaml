@@ -1,0 +1,62 @@
+# i-recs pipeline configuration.
+# Override any value on the command line: --set als.max_iter=5 --set dataset=ml-1m
+# Outputs go to <output_root>/<dataset>/ so datasets never overwrite each other.
+
+dataset: ml-latest-small        # ml-latest-small | ml-1m | ml-25m
+raw_dir: data/raw
+output_root: outputs
+docs_dir: docs
+max_ratings: null               # optional: keep only the N earliest ratings (benchmarks on 25M)
+
+spark:
+  master: local[*]              # overridden by SPARK_MASTER in .env if set
+  driver_memory: 6g
+  shuffle_partitions: 4         # small data: fewer partitions = less Python-worker overhead
+  log_level: ERROR
+
+split:
+  strategy: per_user            # per_user: each user's latest ratings -> test | global: one time cutoff
+  test_fraction: 0.2
+  val_fraction: 0.1             # last part of TRAIN (by time) used for tuning
+  min_user_train: 5             # drop users with fewer train ratings
+
+als:
+  implicit: true                # implicit ALS (ratings as confidence) for top-K; explicit model is fit for RMSE
+  ranks: [20, 40]
+  reg_params: [0.01, 0.05, 0.1]
+  alphas: [1.0, 5.0]            # implicit confidence scale (ignored when implicit: false)
+  rmse_reg_params: [0.05, 0.1, 0.2]   # explicit ALS grid for the RMSE (rating prediction) metric
+  max_iter: 10
+  seed: 42
+  top_k: 10
+  relevance_threshold: 4.0      # test rating >= this counts as relevant / accepted
+
+evidence:
+  n_users: 300                  # users sampled for attribution / explanation / verification
+  recs_per_user: 10             # attribute all top-K recs (utility eval needs them)
+  top_n: 5                      # evidence items kept per recommendation
+  seed: 42
+
+explain:
+  prompt_version: v1
+  max_cited: 2                  # how many evidence items an explanation cites
+  max_llm_calls: 50             # cap on real LLM calls per run (template used beyond this)
+  retries: 1                    # regenerate on grounding failure, then fall back to template
+
+verify:
+  rel_drop_threshold: 0.10      # faithful if score drops >= 10% ...
+  use_rank_criterion: true      # ... or the item falls out of the top-K
+  random_trials: 3              # random-removal baseline trials per explanation
+  seed: 7
+
+utility:
+  test_fraction: 0.3            # user-level holdout for the proxy classifier
+  seed: 11
+
+bench:
+  datasets: [ml-latest-small, ml-1m, ml-25m]
+  max_ratings: {ml-25m: 5000000}
+  masters: ["local[1]", "local[2]", "local[4]"]
+  rank: 20
+  max_iter: 10
+  evidence_users: 200
