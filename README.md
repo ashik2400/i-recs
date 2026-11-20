@@ -95,6 +95,7 @@ All settings live in `configs/default.yaml`; override any of them with
 | M1 train (tune + ALS + metrics) | `python -m src.als.train` | `als_model/`, `recs.parquet`, `als_metrics.json`, `als_tuning.csv` |
 | M2 evidence (fold-in attribution) | `python -m src.evidence.extract` | `evidence.parquet`, `evidence_stats.json` |
 | M3 explanations (evidence-only) | `python -m src.explain.generate` | `explanations.parquet` |
+| M4 grounding + hallucination checks | `python -m src.explain.check` | `grounding.parquet`, `grounding_summary.json` |
 | Tests | `python -m pytest -q` | |
 
 ### Windows notes

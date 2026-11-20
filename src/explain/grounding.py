@@ -25,7 +25,7 @@ GENRE_PATTERNS = {
     "Crime": r"\bcrime\b", "Documentary": r"\bdocumentar(?:y|ies)\b", "Drama": r"\bdrama(?:s|tic)?\b",
     "Fantasy": r"\bfantasy\b", "Film-Noir": r"\b(?:film[- ]noir|noir)\b", "Horror": r"\bhorror\b",
     "IMAX": r"\bimax\b", "Musical": r"\bmusicals?\b", "Mystery": r"\bmyster(?:y|ies)\b",
-    "Romance": r"\b(?:romance|romantic|rom-?coms?)\b", "Sci-Fi": r"\b(?:sci-?fi|science[- ]fiction)\b",
+    "Romance": r"\b(?:romance|romantic|rom-?coms?)\b", "Sci-Fi": r"\b(?:sci[- ]?fi|science[- ]fiction)\b",
     "Thriller": r"\bthrillers?\b", "War": r"\bwar\b", "Western": r"\bwesterns?\b",
 }
 
@@ -46,6 +46,7 @@ YEAR_RE = re.compile(r"\b(18[89]\d|19\d\d|20\d\d)\b")
 def norm_title(title: str) -> str:
     """'Matrix, The (1999)' -> 'the matrix'; lowercase, punctuation stripped."""
     t = re.sub(r"\s*\(\d{4}\)\s*$", "", title or "").strip()
+    t = re.sub(r"\s*\([^)]*\)\s*$", "", t)     # trailing alternate title
     m = re.match(r"^(.*), (The|A|An|Les|La|Le|Il|El|Das|Die|Der)$", t)
     if m:
         t = f"{m.group(2)} {m.group(1)}"
@@ -59,7 +60,7 @@ def norm_text(text: str) -> str:
 
 def display_title(title: str) -> str:
     """'Matrix, The (1999)' -> 'The Matrix (1999)' for human-facing text."""
-    m = re.match(r"^(.*), (The|A|An|Les|La|Le|Il|El|Das|Die|Der)( \(\d{4}\))$", title or "")
+    m = re.match(r"^(.*?), (The|A|An|Les|La|Le|Il|El|Das|Die|Der)((?: \([^()]*\))*)$", title or "")
     return f"{m.group(2)} {m.group(1)}{m.group(3)}" if m else (title or "")
 
 
@@ -141,10 +142,19 @@ def check(text: str, rec: dict, evidence: list[dict], cited_ids: list[int],
     allowed = [rec] + list(evidence)
     allowed_norm = {norm_title(a["title"]) for a in allowed}
     allowed_ids = {int(a["movieId"]) for a in allowed}
+    # remove every surface form of the allowed titles, so their words can neither be
+    # read as other titles/genres nor join neighbouring words into a false title
+    masked = nt
+    forms = set()
+    for a in allowed:
+        forms |= {norm_text(a["title"]), norm_text(display_title(a["title"])), norm_title(a["title"])}
+    for f in sorted(forms, key=len, reverse=True):
+        if f:
+            masked = re.sub(r"(?<![a-z0-9])" + re.escape(f) + r"(?![a-z0-9])", " xsep ", masked)
 
     # 2. other movie titles
     if title_index is not None:
-        for g, ids in title_index.mentions(text).items():
+        for g, ids in title_index.mentions(masked).items():
             if g in allowed_norm or ids & allowed_ids:
                 continue
             if any(g in a for a in allowed_norm):    # sub-phrase of an allowed title
@@ -162,9 +172,7 @@ def check(text: str, rec: dict, evidence: list[dict], cited_ids: list[int],
     allowed_genres = set()
     for a in allowed:
         allowed_genres.update((a.get("genres") or "").split("|"))
-    text_wo_titles = nt
-    for a in allowed:
-        text_wo_titles = text_wo_titles.replace(norm_title(a["title"]), " ")
+    text_wo_titles = masked
     for g, pat in GENRE_PATTERNS.items():
         if re.search(pat, text_wo_titles, re.I) and g not in allowed_genres:
             claims.append(f"genre '{g}' not in evidence")

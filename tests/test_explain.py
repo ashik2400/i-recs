@@ -84,3 +84,24 @@ def test_llm_failure_and_template_provider():
     assert LLMClient(provider="").is_template and LLMClient(provider="template").complete("s", "u") is None
     with pytest.raises(ValueError):
         LLMClient(provider="nope")
+
+
+def test_regressions_alternate_titles_and_adjacent_words():
+    """Real false positives found on MovieLens: alternate titles and 'Like <title>' n-grams."""
+    movies = [(10, "Road Warrior, The (Mad Max 2) (1981)", "Action|Adventure|Sci-Fi|Thriller"),
+              (11, "Mad Max (1979)", "Action|Adventure|Sci-Fi"),
+              (12, "Crazy, Stupid, Love. (2011)", "Comedy|Drama|Romance"),
+              (13, "Like Crazy (2011)", "Drama|Romance"),
+              (14, "Notebook, The (2004)", "Drama|Romance")]
+    index = TitleIndex.build([(m, t) for m, t, _ in movies])
+    tit = {m: (t, g) for m, t, g in movies}
+    assert display_title(tit[10][0]) == "The Road Warrior (Mad Max 2) (1981)"
+    rec = {"movieId": 14, "title": tit[14][0], "genres": tit[14][1]}
+    ev = [{"movieId": m, "title": tit[m][0], "genres": tit[m][1], "rating": 4.0} for m in (12, 10)]
+    text = template_explanation(evidence_payload(rec, ev))
+    r = check(text, rec, ev, [12, 10], index)
+    assert r.grounded, (text, r.unsupported_claims)
+    ev_no_scifi = ev[:1]                                   # only Crazy, Stupid, Love. (no Sci-Fi)
+    t2 = template_explanation(evidence_payload(rec, ev_no_scifi)) + " It is a sci fi film."
+    r2 = check(t2, rec, ev_no_scifi, [12], index)
+    assert not r2.grounded and any("Sci-Fi" in c for c in r2.unsupported_claims)
