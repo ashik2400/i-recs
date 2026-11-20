@@ -93,6 +93,7 @@ All settings live in `configs/default.yaml`; override any of them with
 | Download data | `python -m src.als.download --dataset ml-latest-small` | `data/raw/ml-latest-small/` |
 | M1 prepare (clean + time split) | `python -m src.als.prepare` | `ratings_train/test.parquet`, `movies.parquet` |
 | M1 train (tune + ALS + metrics) | `python -m src.als.train` | `als_model/`, `recs.parquet`, `als_metrics.json`, `als_tuning.csv` |
+| M2 evidence (fold-in attribution) | `python -m src.evidence.extract` | `evidence.parquet`, `evidence_stats.json` |
 | Tests | `python -m pytest -q` | |
 
 ### Windows notes
