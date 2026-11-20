@@ -94,6 +94,7 @@ All settings live in `configs/default.yaml`; override any of them with
 | M1 prepare (clean + time split) | `python -m src.als.prepare` | `ratings_train/test.parquet`, `movies.parquet` |
 | M1 train (tune + ALS + metrics) | `python -m src.als.train` | `als_model/`, `recs.parquet`, `als_metrics.json`, `als_tuning.csv` |
 | M2 evidence (fold-in attribution) | `python -m src.evidence.extract` | `evidence.parquet`, `evidence_stats.json` |
+| M3 explanations (evidence-only) | `python -m src.explain.generate` | `explanations.parquet` |
 | Tests | `python -m pytest -q` | |
 
 ### Windows notes
