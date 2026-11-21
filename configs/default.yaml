@@ -13,6 +13,7 @@ spark:
   driver_memory: 6g
   shuffle_partitions: 4         # small data: fewer partitions = less Python-worker overhead
   log_level: ERROR
+  python_blas_threads: 1        # BLAS threads per Python worker (Spark does the parallelism)
 
 split:
   strategy: per_user            # per_user: each user's latest ratings -> test | global: one time cutoff
@@ -57,7 +58,7 @@ utility:
 bench:
   datasets: [ml-latest-small, ml-1m, ml-25m]
   max_ratings: {ml-25m: 5000000}
-  masters: ["local[1]", "local[2]", "local[4]"]
+  masters: ["local[1]", "local[2]", "local[4]", "local[8]"]
   rank: 20
   max_iter: 10
   evidence_users: 200

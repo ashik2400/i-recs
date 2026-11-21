@@ -1,0 +1,2 @@
+dataset,max_ratings,master,cores,n_ratings,n_train,n_users,n_items,evidence_users,n_recs,t_split,t_als_fit,t_recs,t_evidence,t_verify,faithfulness_score,verify_rows,partitions_per_core,repeat
+ml-25m,5000000,local[4],4,5000000,3979220,51505,3877,200,2000,39.94,33.06,13.11,14.19,15.94,0.4755,8000,2,0

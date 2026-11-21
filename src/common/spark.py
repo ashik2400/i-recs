@@ -9,6 +9,7 @@ from pathlib import Path
 from pyspark.sql import SparkSession
 
 log = logging.getLogger(__name__)
+BLAS_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
 
 
 def hadoop_native_available() -> bool:
@@ -33,6 +34,12 @@ def get_spark(cfg: dict | None = None, app: str = "i-recs", master: str | None =
     # Workers must use the same interpreter as the driver (the venv).
     os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
     os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
+    # One BLAS thread per Python worker: Spark provides the parallelism. Without this
+    # each worker's OpenBLAS spawns a thread per hardware thread, so local[1] is not
+    # single-core and local[N] oversubscribes the CPU.
+    blas = str(scfg.get("python_blas_threads", 1))
+    for var in BLAS_VARS:
+        os.environ[var] = blas
     if os.name == "nt" and hadoop_native_available():
         hb = str(Path(os.environ["HADOOP_HOME"]) / "bin")
         if hb not in os.environ.get("PATH", ""):
@@ -47,6 +54,9 @@ def get_spark(cfg: dict | None = None, app: str = "i-recs", master: str | None =
         .config("spark.ui.showConsoleProgress", "false")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.executorEnv.OPENBLAS_NUM_THREADS", blas)
+        .config("spark.executorEnv.OMP_NUM_THREADS", blas)
+        .config("spark.executorEnv.MKL_NUM_THREADS", blas)
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel(scfg.get("log_level", "ERROR"))

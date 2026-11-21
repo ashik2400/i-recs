@@ -1,0 +1,5 @@
+dataset,max_ratings,master,cores,n_ratings,n_train,n_users,n_items,evidence_users,n_recs,t_split,t_als_fit,t_recs,t_evidence,t_verify,faithfulness_score,verify_rows,partitions_per_core,repeat
+ml-1m,,local[1],1,1000209,797758,6040,3667,2000,20000,36.48,32.8,36.68,46.71,136.98,0.49255,80000,1,0
+ml-1m,,local[2],2,1000209,797758,6040,3667,2000,20000,40.8,20.47,36.66,43.59,133.09,0.47805,80000,1,0
+ml-1m,,local[4],4,1000209,797758,6040,3667,2000,20000,32.55,15.05,33.19,44.59,115.96,0.47875,80000,1,0
+ml-1m,,local[8],8,1000209,797758,6040,3667,2000,20000,32.89,15.05,38.08,42.23,114.16,0.4834,80000,1,0
