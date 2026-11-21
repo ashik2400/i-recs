@@ -41,3 +41,6 @@ derby.log
 Thumbs.db
 
 CONTRIBUTION.md
+
+# report tables (small, generated) are kept
+!docs/*.csv
