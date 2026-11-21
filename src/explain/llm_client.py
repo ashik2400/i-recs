@@ -1,8 +1,9 @@
 """LLM provider behind one interface, configured from .env:
 
-  LLM_PROVIDER = template | ollama | anthropic | openai     (empty -> template)
+  LLM_PROVIDER = template | ollama | anthropic | openai | groq
+                 (empty -> groq if GROQ_API_KEY is set, else template)
   LLM_MODEL    = model name (defaults per provider below)
-  LLM_API_KEY  = key for anthropic / openai
+  LLM_API_KEY  = key for anthropic / openai / groq (groq also reads GROQ_API_KEY)
   LLM_BASE_URL = optional endpoint (ollama default http://localhost:11434;
                  openai: any OpenAI-compatible base URL, e.g. https://api.openai.com/v1)
 
@@ -13,24 +14,30 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import requests
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MODELS = {"ollama": "llama3.2:3b", "anthropic": "claude-opus-5-5", "openai": "gpt-4o-mini"}
+DEFAULT_MODELS = {"ollama": "llama3.2:3b", "anthropic": "claude-opus-5-5", "openai": "gpt-4o-mini",
+                  "groq": "openai/gpt-oss-120b"}
+OPENAI_COMPATIBLE = {"openai": "https://api.openai.com/v1", "groq": "https://api.groq.com/openai/v1"}
 
 
 class LLMClient:
     def __init__(self, provider: str | None = None, model: str | None = None,
                  api_key: str | None = None, base_url: str | None = None, timeout: float = 60.0):
-        self.provider = (provider if provider is not None else os.getenv("LLM_PROVIDER", "")).strip().lower() or "template"
+        if provider is None:
+            provider = os.getenv("LLM_PROVIDER", "").strip() or ("groq" if os.getenv("GROQ_API_KEY", "").strip() else "")
+        self.provider = provider.strip().lower() or "template"
         self.model = (model or os.getenv("LLM_MODEL", "")).strip() or DEFAULT_MODELS.get(self.provider, "template")
-        self.api_key = api_key or os.getenv("LLM_API_KEY", "")
+        self.api_key = (api_key or os.getenv("LLM_API_KEY", "").strip()
+                        or (os.getenv("GROQ_API_KEY", "").strip() if self.provider == "groq" else ""))
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "")).rstrip("/")
         self.timeout = timeout
         self._sdk = None
-        if self.provider not in ("template", "ollama", "anthropic", "openai"):
+        if self.provider not in ("template", "ollama", "anthropic", "openai", "groq"):
             raise ValueError(f"unknown LLM_PROVIDER {self.provider!r}")
 
     @property
@@ -60,12 +67,21 @@ class LLMClient:
         return r.json()["message"]["content"].strip()
 
     def _openai(self, system: str, user: str) -> str | None:
-        url = (self.base_url or "https://api.openai.com/v1") + "/chat/completions"
-        r = requests.post(url, timeout=self.timeout, headers={"Authorization": f"Bearer {self.api_key}"}, json={
-            "model": self.model, "temperature": 0, "max_tokens": 200,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
+        url = (self.base_url or OPENAI_COMPATIBLE[self.provider]) + "/chat/completions"
+        body = {"model": self.model, "temperature": 0, "max_tokens": 1024,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        if "gpt-oss" in self.model:                         # reasoning model: keep reasoning short
+            body["reasoning_effort"] = "low"
+        for attempt in range(4):
+            r = requests.post(url, timeout=self.timeout, headers={"Authorization": f"Bearer {self.api_key}"}, json=body)
+            if r.status_code == 429 and attempt < 3:          # free tiers rate-limit: wait and retry
+                time.sleep(min(float(r.headers.get("retry-after", 5) or 5), 30))
+                continue
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"].strip()
+        return None
+
+    _groq = _openai
 
     def _anthropic_client(self):
         if self._sdk is None:
